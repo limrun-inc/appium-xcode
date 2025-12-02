@@ -1,11 +1,22 @@
 import _ from 'lodash';
-import B from 'bluebird';
-import { exec } from 'teen_process';
 import type { TeenProcessExecResult } from 'teen_process';
-import { fs, plist } from '@appium/support';
-import path from 'node:path';
+import { Ios } from '@limrun/api';
 
 export const XCRUN_TIMEOUT = 15000;
+
+// limrunIosClient must be set before this module is used.
+var limrunIosClient: Ios.InstanceClient | null = null;
+
+export function setLimrunIosClient(client: Ios.InstanceClient) {
+  limrunIosClient = client;
+}
+
+export function getLimrunIosClient(): Ios.InstanceClient {
+  if (!limrunIosClient) {
+    throw new Error('Limrun iOS client not set');
+  }
+  return limrunIosClient;
+}
 
 /**
  * Executes 'xcrun' command line utility
@@ -17,7 +28,30 @@ export const XCRUN_TIMEOUT = 15000;
  */
 export async function runXcrunCommand(args: string[], timeout: number = XCRUN_TIMEOUT): Promise<TeenProcessExecResult<string>> {
   try {
-    return await exec('xcrun', args, {timeout});
+    const result = await getLimrunIosClient().xcrun(args);
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      code: result.exitCode,
+    };
+  } catch (err) {
+    // the true error can be hidden within the stderr
+    if (err.stderr) {
+      err.message = `${err.message}: ${err.stderr}`;
+    }
+
+    throw err;
+  }
+}
+
+export async function runXcodebuildCommand(args: string[], timeout: number = XCRUN_TIMEOUT): Promise<TeenProcessExecResult<string>> {
+  try {
+    const result = await getLimrunIosClient().xcodebuild(args as ['-version']);
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      code: result.exitCode,
+    };
   } catch (err) {
     // the true error can be hidden within the stderr
     if (err.stderr) {
@@ -35,28 +69,7 @@ export async function runXcrunCommand(args: string[], timeout: number = XCRUN_TI
  * @returns Full paths to where the app with the given bundle id is present.
  */
 export async function findAppPaths(bundleId: string): Promise<string[]> {
-  let stdout: string;
-  try {
-    ({stdout} = await exec('/usr/bin/mdfind', [
-      `kMDItemCFBundleIdentifier=${bundleId}`
-    ]));
-  } catch {
-    return [];
-  }
-
-  const matchedPaths = _.trim(stdout)
-    .split('\n')
-    .map(_.trim)
-    .filter(Boolean);
-  if (_.isEmpty(matchedPaths)) {
-    return [];
-  }
-  const results = matchedPaths.map((p) => (async () => {
-    if (await fs.exists(p)) {
-      return p;
-    }
-  })());
-  return (await B.all(results)).filter(Boolean) as string[];
+  throw new Error('findAppPaths is not implemented');
 }
 
 /**
@@ -66,8 +79,5 @@ export async function findAppPaths(bundleId: string): Promise<string[]> {
  * @returns All plist entries as an object or an empty object if no plist was found
  */
 export async function readXcodePlist(developerRoot: string): Promise<Record<string, any>> {
-  const plistPath = path.resolve(developerRoot, '..', 'Info.plist');
-  return await fs.exists(plistPath)
-    ? await plist.parsePlistFile(plistPath)
-    : {};
+  throw new Error('readXcodePlist is not implemented');
 }

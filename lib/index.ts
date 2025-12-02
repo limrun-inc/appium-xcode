@@ -7,12 +7,15 @@ import {
   getClangVersion,
 } from './xcode';
 
+import { setLimrunIosClient } from './helpers';
+
 const xcode = {
   getPath,
   getVersion,
   getMaxIOSSDK,
   getMaxTVOSSDK,
-  getClangVersion
+  getClangVersion,
+  setLimrunIosClient,
 };
 
 export {
@@ -20,7 +23,8 @@ export {
   getVersion,
   getMaxIOSSDK,
   getMaxTVOSSDK,
-  getClangVersion
+  getClangVersion,
+  setLimrunIosClient,
 };
 export default xcode;
 

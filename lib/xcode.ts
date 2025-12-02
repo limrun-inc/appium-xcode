@@ -5,7 +5,7 @@ import _ from 'lodash';
 import { exec } from 'teen_process';
 import * as semver from 'semver';
 import {
-  runXcrunCommand, findAppPaths, XCRUN_TIMEOUT, readXcodePlist
+  runXcrunCommand, findAppPaths, XCRUN_TIMEOUT, readXcodePlist, runXcodebuildCommand
 } from './helpers';
 import type { XcodeVersion } from './types';
 
@@ -135,20 +135,7 @@ export async function getVersion(parse: boolean = false, retries: number = DEFAU
  * if CLT are not installed.
  */
 export async function getClangVersion(): Promise<string | null> {
-  try {
-    await fs.which('clang');
-  } catch {
-    log.info('Cannot find clang executable on the local system. ' +
-      'Are Xcode Command Line Tools installed?');
-    return null;
-  }
-  const {stdout} = await exec('clang', ['--version']);
-  const match = /clang-([0-9.]+)/.exec(stdout);
-  if (!match) {
-    log.info(`Cannot parse clang version from ${stdout}`);
-    return null;
-  }
-  return match[1];
+  throw new Error('getClangVersion is not implemented');
 }
 
 /**
@@ -223,11 +210,19 @@ export const getMaxTVOSSDK = _.memoize(
  * @returns Xcode version
  * @throws {Error} If there was a failure while retrieving the version
  */
-async function getVersionWithoutRetry(timeout: number = XCRUN_TIMEOUT): Promise<semver.SemVer | null> {
-  const developerPath = await getPath(timeout);
-  // we want to read the CFBundleShortVersionString from Xcode's plist.
-  const {CFBundleShortVersionString} = await readXcodePlist(developerPath);
-  return semver.coerce(CFBundleShortVersionString);
+  async function getVersionWithoutRetry(timeout: number = XCRUN_TIMEOUT): Promise<semver.SemVer | null> {
+  const { stdout } = await runXcodebuildCommand(['-version'], timeout);
+  // Support both major.minor and major.minor.patch (e.g. "Xcode 26.2" or "Xcode 15.3.1")
+  const match = /Xcode\s+(\d+\.\d+(?:\.\d+)?)/.exec(stdout);
+  if (!match) {
+    throw new Error(`Cannot parse Xcode version from ${stdout}`);
+  }
+  const versionString = match[1];
+  const version = semver.coerce(versionString);
+  if (!version) {
+    throw new Error(`Unable to parse version '${versionString}'`);
+  }
+  return version;
 }
 
 /**
